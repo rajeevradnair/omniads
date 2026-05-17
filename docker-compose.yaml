@@ -1,0 +1,10 @@
+services:
+  ads-gateway:
+    build:
+      context: .
+      dockerfile: services/ads_gateway/Dockerfile
+    container_name: omniads-ads-gateway
+    ports:
+      - "8000:8000"
+    environment:
+      - SERVICE_NAME=ads-gateway
