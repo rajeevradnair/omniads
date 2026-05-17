@@ -6,7 +6,7 @@ from services.ads_gateway.app.orchestration.trace_context import create_decision
 
 router = APIRouter()
 
-@router.post("/services/ads_gateway/app/api/ads/decision")
+@router.post("/api/v1/ads_gateway/ads/decision")
 def create_ad_decision(request: AdDecisionRequest) -> AdDecisionResponse:
     
     trace = create_decision_trace()

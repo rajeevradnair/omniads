@@ -1,4 +1,17 @@
 services:
+  postgres:
+    image: postgres:16
+    container_name: omniads-postgres
+    environment:
+      POSTGRES_DB: omniads
+      POSTGRES_USER: omniads
+      POSTGRES_PASSWORD: omniads
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./sql/postgres/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql
+      - ./sql/postgres/seed_campaigns.sql:/docker-entrypoint-initdb.d/02_seed_campaigns.sql
+
   ads-gateway:
     build:
       context: .
@@ -8,3 +21,16 @@ services:
       - "8000:8000"
     environment:
       - SERVICE_NAME=ads-gateway
+
+  campaign-service:
+    build:
+      context: .
+      dockerfile: services/campaign_service/Dockerfile
+    container_name: omniads-campaign-service
+    ports:
+      - "8001:8001"
+    environment:
+      - SERVICE_NAME=campaign-service
+      - DATABASE_URL=postgresql://omniads:omniads@postgres:5432/omniads
+    depends_on:
+      - postgres

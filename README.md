@@ -25,3 +25,22 @@ A mock MediaTailor-style request enters the ADS Gateway. The gateway creates:
 - `decision_id`
 
 Then returns a mock campaign and creative decision.
+
+## Campaign Service
+
+The Campaign Service was added to own advertiser, campaign, creative, and placement metadata.
+
+Current endpoints:
+
+- `GET /health`
+- `GET /campaigns/active?placement_id=sports_midroll_001`
+
+The service uses PostgreSQL locally through Docker Compose.
+
+Current data model:
+
+- advertisers
+- campaigns
+- creatives
+- placements
+- campaign_placements

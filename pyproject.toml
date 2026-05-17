@@ -7,7 +7,8 @@ dependencies = [
     "fastapi>=0.110.0",
     "uvicorn[standard]>=0.27.0",
     "pydantic>=2.6.0",
-    "python-dotenv>=1.0.0"
+    "python-dotenv>=1.0.0",
+    "psycopg[binary]>=3.1.18"
 ]
 
 [tool.pytest.ini_options]

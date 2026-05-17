@@ -2,9 +2,10 @@ from fastapi import APIRouter
 
 router = APIRouter()
 
-@router.get("/api/v1/ads_gateway/health")
+
+@router.get("/api/v1/campaigns/health")
 def health_check() -> dict:
     return {
-        "service": "ads-gateway",
+        "service": "campaign-service",
         "status": "healthy",
     }
