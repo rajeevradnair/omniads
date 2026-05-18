@@ -9,8 +9,8 @@ The project models how a server-side ad insertion workflow, such as an AWS Media
 Implemented the ADS Gateway foundation:
 
 - FastAPI service
-- `/services/ads_gateway/app/api/health` GET endpoint
-- `/services/ads_gateway/app/api/ads/decision` POST endpoint
+- `GET  /api/v1/ads_gateway/health`
+- `POST /api/v1/ads_gateway/ads/decision`
 - Ad decision request contract
 - Ad decision response contract
 - Request, trace, and decision ID generation
@@ -32,8 +32,8 @@ The Campaign Service was added to own advertiser, campaign, creative, and placem
 
 Current endpoints:
 
-- `GET /health`
-- `GET /campaigns/active?placement_id=sports_midroll_001`
+- `GET /api/v1/campaigns/health`
+- `GET /api/v1/campaigns/active?placement_id=sports_midroll_001`
 
 The service uses PostgreSQL locally through Docker Compose.
 
