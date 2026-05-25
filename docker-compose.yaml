@@ -21,6 +21,9 @@ services:
       - "8000:8000"
     environment:
       - SERVICE_NAME=ads-gateway
+      - CAMPAIGN_SERVICE_URL=http://campaign-service:8001
+    depends_on:
+      - campaign-service
 
   campaign-service:
     build:

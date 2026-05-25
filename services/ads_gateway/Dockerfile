@@ -6,7 +6,7 @@ COPY pyproject.toml /app/pyproject.toml
 COPY libs /app/libs
 COPY services/ads_gateway /app/services/ads_gateway
 
-RUN pip install --no-cache-dir fastapi "uvicorn[standard]" pydantic python-dotenv
+RUN pip install --no-cache-dir fastapi "uvicorn[standard]" pydantic python-dotenv httpx "psycopg[binary]"
 
 EXPOSE 8000
 

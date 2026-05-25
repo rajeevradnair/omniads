@@ -44,3 +44,26 @@ Current data model:
 - creatives
 - placements
 - campaign_placements
+
+## Service-to-Service Campaign Lookup
+
+The ADS Gateway calls Campaign Service over HTTP.
+
+Current flow:
+
+```text
+POST /ads/decision
+        |
+        v
+ADS Gateway
+        |
+        v
+GET /campaigns/active?placement_id=...
+        |
+        v
+Campaign Service
+        |
+        v
+PostgreSQL
+
+The Gateway temporarily selects the first active campaign returned by Campaign Service. Future releases will replace this temporary selection with targeting, pacing, scoring, ranking, and VAST generation.
