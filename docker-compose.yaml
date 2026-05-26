@@ -22,8 +22,10 @@ services:
     environment:
       - SERVICE_NAME=ads-gateway
       - CAMPAIGN_SERVICE_URL=http://campaign-service:8001
+      - TARGETING_SERVICE_URL=http://targeting-service:8002
     depends_on:
       - campaign-service
+      - targeting-service
 
   campaign-service:
     build:
@@ -37,3 +39,13 @@ services:
       - DATABASE_URL=postgresql://omniads:omniads@postgres:5432/omniads
     depends_on:
       - postgres
+
+  targeting-service:
+    build:
+      context: .
+      dockerfile: services/targeting_service/Dockerfile
+    container_name: omniads-targeting-service
+    ports:
+      - "8002:8002"
+    environment:
+      - SERVICE_NAME=targeting-service

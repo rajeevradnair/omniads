@@ -2,6 +2,9 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
+from libs.contracts.targeting import RejectedCampaign
+
+
 class AdDecisionResponse(BaseModel):
     request_id: str
     trace_id: str
@@ -12,3 +15,6 @@ class AdDecisionResponse(BaseModel):
     reason: str
     candidate_count: int = 0
     candidate_campaign_ids: list[str] = Field(default_factory=list)
+    eligible_candidate_count: int = 0
+    eligible_campaign_ids: list[str] = Field(default_factory=list)
+    rejected_campaigns: list[RejectedCampaign] = Field(default_factory=list)

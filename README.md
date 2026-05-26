@@ -65,5 +65,24 @@ Campaign Service
         |
         v
 PostgreSQL
+```
 
 The Gateway temporarily selects the first active campaign returned by Campaign Service. Future releases will replace this temporary selection with targeting, pacing, scoring, ranking, and VAST generation.
+
+## Targeting Service
+
+The Targeting Service evaluates whether active campaign candidates are eligible for a specific ad request.
+
+Current flow:
+
+```text
+ADS Gateway
+   |
+   v
+Campaign Service
+   |
+   v
+Targeting Service
+   |
+   v
+Eligible campaigns + rejection reasons
