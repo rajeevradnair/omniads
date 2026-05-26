@@ -29,7 +29,6 @@ CAMPAIGN_TARGETING_RULES: dict[str, dict[str, set[str]]] = {
     },
 }
 
-
 def evaluate_targeting(
     ad_request: AdDecisionRequest,
     candidates: list[ActiveCampaign],

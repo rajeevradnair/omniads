@@ -1,0 +1,12 @@
+{
+  "creative_id": "creative_streamfuel_15s",
+  "campaign_id": "camp_streamfuel_live_sports",
+  "advertiser_name": "StreamFuel Sports Drink",
+  "creative_name": "Stay in the Game",
+  "duration_seconds": 15,
+  "media_url": "http://localhost:9000/assets/ads/streamfuel_15s.mp4",
+  "thumbnail_url": "http://localhost:9000/assets/ads/thumbnails/streamfuel_thumbnail.png",
+  "creative_type": "VIDEO",
+  "placement": "sports_midroll_001",
+  "message": "Hydration and energy for sports fans"
+}

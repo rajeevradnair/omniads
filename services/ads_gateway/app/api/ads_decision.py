@@ -3,11 +3,16 @@ from fastapi import APIRouter, HTTPException
 
 from libs.contracts.ad_request import AdDecisionRequest
 from libs.contracts.ad_response import AdDecisionResponse
+from libs.contracts.vast import VastRenderRequest
+
 from services.ads_gateway.app.clients.campaign_client import CampaignServiceClient
 from services.ads_gateway.app.clients.targeting_client import TargetingServiceClient
+from services.ads_gateway.app.clients.vast_client import VastServiceClient
+
 from services.ads_gateway.app.config import (
     get_campaign_service_url,
     get_targeting_service_url,
+    get_vast_service_url,
 )
 from services.ads_gateway.app.orchestration.trace_context import (
     create_decision_trace,
@@ -27,6 +32,10 @@ def create_ad_decision(request: AdDecisionRequest) -> AdDecisionResponse:
     )
     targeting_client = TargetingServiceClient(
         base_url=get_targeting_service_url(),
+    )
+
+    vast_client = VastServiceClient(
+        base_url=get_vast_service_url(),
     )
 
     try:
@@ -95,6 +104,26 @@ def create_ad_decision(request: AdDecisionRequest) -> AdDecisionResponse:
 
     selected_campaign = targeting_result.eligible_campaigns[0]
 
+    vast_request = VastRenderRequest(
+        request_id=trace.request_id,
+        trace_id=trace.trace_id,
+        decision_id=trace.decision_id,
+        campaign_id=selected_campaign.campaign_id,
+        creative_id=selected_campaign.creative_id,
+        creative_name=selected_campaign.creative_name,
+        advertiser_name=selected_campaign.advertiser_name,
+        media_url=selected_campaign.media_url,
+        duration_seconds=selected_campaign.duration_seconds,
+    )
+
+    try:
+        vast_response = vast_client.render_vast(vast_request)
+    except httpx.HTTPError as exec:
+        raise HTTPException(
+            status_code=502,
+            detail=f"ADS Gateway could not render VAST XML: {exec}",
+        ) from exec
+
     return AdDecisionResponse(
         request_id=trace.request_id,
         trace_id=trace.trace_id,
@@ -116,4 +145,5 @@ def create_ad_decision(request: AdDecisionRequest) -> AdDecisionResponse:
             for campaign in targeting_result.eligible_campaigns
         ],
         rejected_campaigns=targeting_result.rejected_campaigns,
+        vast_xml=vast_response.vast_xml,
     )

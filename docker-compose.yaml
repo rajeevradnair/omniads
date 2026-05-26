@@ -23,9 +23,11 @@ services:
       - SERVICE_NAME=ads-gateway
       - CAMPAIGN_SERVICE_URL=http://campaign-service:8001
       - TARGETING_SERVICE_URL=http://targeting-service:8002
+      - VAST_SERVICE_URL=http://vast-service:8003
     depends_on:
       - campaign-service
       - targeting-service
+      - vast-service
 
   campaign-service:
     build:
@@ -49,3 +51,13 @@ services:
       - "8002:8002"
     environment:
       - SERVICE_NAME=targeting-service
+  
+  vast-service:
+    build:
+      context: .
+      dockerfile: services/vast_service/Dockerfile
+    container_name: omniads-vast-service
+    ports:
+      - "8003:8003"
+    environment:
+      - SERVICE_NAME=vast-service
