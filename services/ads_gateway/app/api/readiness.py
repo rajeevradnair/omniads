@@ -3,7 +3,9 @@ from fastapi import APIRouter
 from libs.contracts.service_status import ReadinessResponse
 from services.ads_gateway.app.config import (
     get_campaign_service_url,
+    get_candidate_service_url,
     get_targeting_service_url,
+    get_frequency_cap_service_url,
     get_vast_service_url,
 )
 from services.ads_gateway.app.orchestration.readiness_probe import (
@@ -24,11 +26,15 @@ def readiness_check() -> ReadinessResponse:
         ),
         check_http_dependency(
             name="candidate-service",
-            health_url=f"{get_campaign_service_url()}/api/v1/candidates/health",
+            health_url=f"{get_candidate_service_url()}/api/v1/candidates/health",
         ),
         check_http_dependency(
             name="targeting-service",
             health_url=f"{get_targeting_service_url()}/api/v1/targeting/health",
+        ),
+        check_http_dependency(
+            name="frequency-cap-service",
+            health_url=f"{get_frequency_cap_service_url()}/api/v1/frequency-caps/health",
         ),
         check_http_dependency(
             name="vast-service",

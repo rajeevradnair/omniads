@@ -13,3 +13,6 @@ def get_vast_service_url() -> str:
 
 def get_candidate_service_url() -> str:
     return os.getenv("CANDIDATE_SERVICE_URL", "http://candidate-service:8004")
+
+def get_frequency_cap_service_url() -> str:
+    return os.getenv("FREQUENCY_CAP_SERVICE_URL","http://frequency-cap-service:8005")

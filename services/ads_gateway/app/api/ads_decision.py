@@ -13,11 +13,14 @@ from services.ads_gateway.app.clients.campaign_client import CampaignServiceClie
 from services.ads_gateway.app.clients.targeting_client import TargetingServiceClient
 from services.ads_gateway.app.clients.vast_client import VastServiceClient
 from services.ads_gateway.app.clients.candidate_client import CandidateServiceClient
+from services.ads_gateway.app.clients.frequency_cap_client import FrequencyCapServiceClient
+
 
 from services.ads_gateway.app.config import (
     get_campaign_service_url,
     get_candidate_service_url,
     get_targeting_service_url,
+    get_frequency_cap_service_url,
     get_vast_service_url,
 )
 from services.ads_gateway.app.orchestration.trace_context import (
@@ -60,7 +63,9 @@ def create_ad_decision(request: AdDecisionRequest) -> AdDecisionResponse:
     targeting_client = TargetingServiceClient(
         base_url=get_targeting_service_url(),
     )
-
+    frequency_cap_client = FrequencyCapServiceClient(
+        base_url=get_frequency_cap_service_url(),
+    )
     vast_client = VastServiceClient(
         base_url=get_vast_service_url(),
     )
@@ -211,7 +216,53 @@ def create_ad_decision(request: AdDecisionRequest) -> AdDecisionResponse:
             rejected_campaigns=targeting_result.rejected_campaigns,
         )
 
-    selected_campaign = targeting_result.eligible_campaigns[0]
+    try:
+        frequency_cap_result = frequency_cap_client.evaluate(
+            ad_request=request,
+            candidates=targeting_result.eligible_campaigns,
+            max_daily_impressions_per_creative=3,
+        )
+    except httpx.HTTPError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=(
+                "ADS Gateway could not evaluate frequency caps through "
+                f"Frequency Cap Service: {exc}"
+            ),
+        ) from exc
+
+    if not frequency_cap_result.allowed_candidates:
+        return AdDecisionResponse(
+            request_id=trace.request_id,
+            trace_id=trace.trace_id,
+            decision_id=trace.decision_id,
+            selected_campaign_id=None,
+            selected_creative_id=None,
+            status="NO_FILL_FREQUENCY_CAP",
+            reason="All eligible candidates were blocked by frequency caps.",
+            candidate_count=len(active_campaigns),
+            candidate_campaign_ids=[
+                campaign.campaign_id for campaign in active_campaigns
+            ],
+            generated_candidate_count=len(candidate_result.candidates),
+            generated_candidate_campaign_ids=[
+                campaign.campaign_id for campaign in candidate_result.candidates
+            ],
+            candidate_reasons=candidate_result.candidate_reasons,
+            eligible_candidate_count=len(targeting_result.eligible_campaigns),
+            eligible_campaign_ids=[
+                campaign.campaign_id
+                for campaign in targeting_result.eligible_campaigns
+            ],
+            rejected_campaigns=targeting_result.rejected_campaigns,
+            frequency_cap_allowed_count=0,
+            frequency_cap_allowed_campaign_ids=[],
+            frequency_cap_blocked=frequency_cap_result.blocked_candidates,
+            frequency_cap_recorded_count=None,
+            vast_xml=None,
+        )
+    
+    selected_campaign = frequency_cap_result.allowed_candidates[0]
 
     vast_lookup_start = time.perf_counter()
 
@@ -257,6 +308,22 @@ def create_ad_decision(request: AdDecisionRequest) -> AdDecisionResponse:
             detail=f"ADS Gateway could not render VAST XML: {exec}",
         ) from exec
 
+    try:
+        cap_record_response = frequency_cap_client.record(
+            viewer_id=request.viewer_id,
+            campaign_id=selected_campaign.campaign_id,
+            creative_id=selected_campaign.creative_id,
+            decision_id=trace.decision_id,
+        )
+    except httpx.HTTPError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=(
+                "ADS Gateway could not record frequency cap exposure: "
+                f"{exc}"
+            ),
+        ) from exc
+
     return AdDecisionResponse(
         request_id=trace.request_id,
         trace_id=trace.trace_id,
@@ -265,8 +332,8 @@ def create_ad_decision(request: AdDecisionRequest) -> AdDecisionResponse:
         selected_creative_id=selected_campaign.creative_id,
         status="TARGETING_DECISION_RETURNED",
         reason=(
-            "Temporary selection made from campaigns that passed targeting. "
-            "Ranking logic will be added in a later release."
+            "Temporary selection made from campaigns that passed top-K candidate retrieval & targeting. "
+            "Ranking logic to be added in a later release."
         ),
         candidate_count=len(active_campaigns),
         candidate_campaign_ids=[
@@ -284,4 +351,11 @@ def create_ad_decision(request: AdDecisionRequest) -> AdDecisionResponse:
         ],
         rejected_campaigns=targeting_result.rejected_campaigns,
         vast_xml=vast_response.vast_xml,
+        frequency_cap_allowed_count=len(frequency_cap_result.allowed_candidates),
+        frequency_cap_allowed_campaign_ids=[
+            campaign.campaign_id
+            for campaign in frequency_cap_result.allowed_candidates
+        ],
+        frequency_cap_blocked=frequency_cap_result.blocked_candidates,
+        frequency_cap_recorded_count=cap_record_response.new_count,
     )

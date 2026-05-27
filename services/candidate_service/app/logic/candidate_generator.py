@@ -21,6 +21,7 @@ def generate_candidates(
             campaign=campaign,
         )
 
+        # Managing it as a list of tuples
         scored_candidates.append(
             (
                 campaign,
@@ -33,11 +34,13 @@ def generate_candidates(
             )
         )
 
+    # Sort in descending order based on candidate_score attribute of second tuple item
     scored_candidates.sort(
         key=lambda item: item[1].candidate_score,
         reverse=True,
     )
 
+    # Fetch top k
     top_scored_candidates = scored_candidates[:max_candidates]
 
     return CandidateGenerationResponse(
@@ -83,13 +86,15 @@ def _objective_bonus(objective: str) -> float:
     if objective_upper == "CONVERSION":
         return 4.0
 
-    if objective_upper == "CONSIDERATION":
+    if objective_upper == "LEAD_GENERATION":
         return 3.0
+    
+    if objective_upper == "CONSIDERATION":
+        return 2.5
 
     if objective_upper == "AWARENESS":
         return 2.0
 
-    if objective_upper == "LEAD_GENERATION":
-        return 2.5
+
 
     return 0.0

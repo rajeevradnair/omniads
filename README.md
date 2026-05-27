@@ -108,3 +108,34 @@ Targeting Service
    |
    v
 VAST Service
+```
+
+## Frequency Cap Service
+
+The Frequency Cap Service was added in Release 2 to prevent overexposure.
+
+Current endpoints:
+
+- `GET /api/v1/frequency_caps/health`
+- `POST /api/v1/frequency_caps/frequency-caps/evaluate`
+- `POST /api/v1/frequency_caps/frequency-caps/record`
+
+Current flow:
+
+```text
+ADS Gateway
+   |
+   v
+Campaign Service
+   |
+   v
+Candidate Service
+   |
+   v
+Targeting Service
+   |
+   v
+Frequency Cap Service
+   |
+   v
+VAST Service

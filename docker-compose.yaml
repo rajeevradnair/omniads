@@ -25,10 +25,12 @@ services:
       - TARGETING_SERVICE_URL=http://targeting-service:8002
       - VAST_SERVICE_URL=http://vast-service:8003
       - CANDIDATE_SERVICE_URL=http://candidate-service:8004
+      - FREQUENCY_CAP_SERVICE_URL=http://frequency-cap-service:8005
     depends_on:
       - campaign-service
       - candidate-service
       - targeting-service
+      - frequency-cap-service
       - vast-service
 
   campaign-service:
@@ -73,3 +75,13 @@ services:
       - "8004:8004"
     environment:
       - SERVICE_NAME=candidate-service
+  
+  frequency-cap-service:
+    build:
+      context: .
+      dockerfile: services/frequency_cap_service/Dockerfile
+    container_name: omniads-frequency-cap-service
+    ports:
+      - "8005:8005"
+    environment:
+      - SERVICE_NAME=frequency-cap-service

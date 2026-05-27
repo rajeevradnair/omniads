@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field
 
 from libs.contracts.targeting import RejectedCampaign
 from libs.contracts.candidate import CandidateReason
+from libs.contracts.frequency_cap import FrequencyCapBlockedCandidate
 
 # Flow: 
 # active campaigns (campaign_service) 
@@ -26,4 +27,8 @@ class AdDecisionResponse(BaseModel):
     eligible_candidate_count: int = 0
     eligible_campaign_ids: list[str] = Field(default_factory=list)
     rejected_campaigns: list[RejectedCampaign] = Field(default_factory=list)
+    frequency_cap_allowed_count: int = 0
+    frequency_cap_allowed_campaign_ids: list[str] = Field(default_factory=list)
+    frequency_cap_blocked: list[FrequencyCapBlockedCandidate] = Field(default_factory=list)
+    frequency_cap_recorded_count: int | None = None
     vast_xml: Optional[str] = None
