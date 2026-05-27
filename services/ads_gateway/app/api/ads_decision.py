@@ -1,4 +1,8 @@
 import httpx
+import time
+
+from libs.observability.logger import log_event
+
 from fastapi import APIRouter, HTTPException
 
 from libs.contracts.ad_request import AdDecisionRequest
@@ -27,6 +31,24 @@ def create_ad_decision(request: AdDecisionRequest) -> AdDecisionResponse:
 
     trace = create_decision_trace()
 
+    workflow_start = time.perf_counter()
+
+    log_event(
+        service_name="ads-gateway",
+        operation_name="ad_decision_started",
+        status="started",
+        trace_id=trace.trace_id,
+        request_id=trace.request_id,
+        decision_id=trace.decision_id,
+        extra={
+            "placement_id": request.placement_id,
+            "viewer_id": request.viewer_id,
+            "session_id": request.session_id,
+            "content_id": request.content_id,
+        },
+    )
+
+    # Clients to various microservices
     campaign_client = CampaignServiceClient(
         base_url=get_campaign_service_url(),
     )
@@ -38,11 +60,32 @@ def create_ad_decision(request: AdDecisionRequest) -> AdDecisionResponse:
         base_url=get_vast_service_url(),
     )
 
+    campaign_lookup_start = time.perf_counter()
     try:
         active_campaigns = campaign_client.list_active_campaigns(
             placement_id=request.placement_id,
         )
+        log_event(
+            service_name="ads-gateway",
+            operation_name="campaign_lookup",
+            status="success",
+            trace_id=trace.trace_id,
+            request_id=trace.request_id,
+            decision_id=trace.decision_id,
+            latency_ms=(time.perf_counter() - campaign_lookup_start) * 1000,
+            extra={"candidate_count": len(active_campaigns)},
+        )
     except httpx.HTTPError as exc:
+        log_event(
+            service_name="ads-gateway",
+            operation_name="campaign_lookup",
+            status="failed",
+            trace_id=trace.trace_id,
+            request_id=trace.request_id,
+            decision_id=trace.decision_id,
+            error_type=type(exc).__name__,
+        )
+
         raise HTTPException(
             status_code=502,
             detail=(
@@ -70,12 +113,33 @@ def create_ad_decision(request: AdDecisionRequest) -> AdDecisionResponse:
             rejected_campaigns=[],
         )
 
+    targeting_lookup_start = time.perf_counter()
     try:
         targeting_result = targeting_client.evaluate(
             ad_request=request,
             candidates=active_campaigns,
         )
+        log_event(
+            service_name="ads-gateway",
+            operation_name="targeting_lookup",
+            status="success",
+            trace_id=trace.trace_id,
+            request_id=trace.request_id,
+            decision_id=trace.decision_id,
+            latency_ms=(time.perf_counter() - targeting_lookup_start) * 1000,
+        )
     except httpx.HTTPError as exc:
+
+        log_event(
+            service_name="ads-gateway",
+            operation_name="targeting_lookup",
+            status="failed",
+            trace_id=trace.trace_id,
+            request_id=trace.request_id,
+            decision_id=trace.decision_id,
+            error_type=type(exc).__name__,
+        )
+
         raise HTTPException(
             status_code=502,
             detail=(
@@ -104,6 +168,8 @@ def create_ad_decision(request: AdDecisionRequest) -> AdDecisionResponse:
 
     selected_campaign = targeting_result.eligible_campaigns[0]
 
+    vast_lookup_start = time.perf_counter()
+
     vast_request = VastRenderRequest(
         request_id=trace.request_id,
         trace_id=trace.trace_id,
@@ -118,7 +184,29 @@ def create_ad_decision(request: AdDecisionRequest) -> AdDecisionResponse:
 
     try:
         vast_response = vast_client.render_vast(vast_request)
+    
+        log_event(
+            service_name="ads-gateway",
+            operation_name="vast_lookup",
+            status="success",
+            trace_id=trace.trace_id,
+            request_id=trace.request_id,
+            decision_id=trace.decision_id,
+            latency_ms=(time.perf_counter() - vast_lookup_start) * 1000,
+        )
+    
     except httpx.HTTPError as exec:
+
+        log_event(
+            service_name="ads-gateway",
+            operation_name="vast_lookup",
+            status="failed",
+            trace_id=trace.trace_id,
+            request_id=trace.request_id,
+            decision_id=trace.decision_id,
+            error_type=type(exc).__name__,
+        )
+
         raise HTTPException(
             status_code=502,
             detail=f"ADS Gateway could not render VAST XML: {exec}",

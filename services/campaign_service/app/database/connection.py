@@ -23,3 +23,16 @@ def get_connection() -> Iterator[Connection]:
         yield connection
     finally:
         connection.close()
+
+
+def can_connect_to_database() -> tuple[bool, str | None]:
+    """Return whether Campaign Service can connect to PostgreSQL."""
+
+    try:
+        with psycopg.connect(get_database_url()) as connection:
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT 1;")
+                cursor.fetchone()
+        return True, None
+    except Exception as exc:  # Broad only for readiness reporting.
+        return False, str(exc)
