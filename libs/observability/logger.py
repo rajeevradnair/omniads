@@ -30,17 +30,17 @@ def log_event(
 
     event = {
         "timestamp_epoch_ms": int(time.time() * 1000),
-        "service_name": service_name,
-        "operation_name": operation_name,
-        "status": status,
         "trace_id": trace_id,
         "request_id": request_id,
         "decision_id": decision_id,
         "latency_ms": latency_ms,
+        "service_name": service_name,
+        "operation_name": operation_name,
+        "status": status,
         "error_type": error_type,
     }
 
     if extra:
         event.update(extra)
 
-    print(json.dumps(event, sort_keys=True))
+    print(json.dumps(event))

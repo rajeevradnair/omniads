@@ -10,3 +10,6 @@ def get_targeting_service_url() -> str:
 
 def get_vast_service_url() -> str:
     return os.getenv("VAST_SERVICE_URL", "http://vast-service:8003")
+
+def get_candidate_service_url() -> str:
+    return os.getenv("CANDIDATE_SERVICE_URL", "http://candidate-service:8004")

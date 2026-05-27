@@ -86,3 +86,25 @@ Targeting Service
    |
    v
 Eligible campaigns + rejection reasons
+```
+
+## Candidate Service
+
+The Candidate Service was added in Release 2 to reduce active campaigns into a smaller top-K candidate set.
+
+Current flow:
+
+```text
+ADS Gateway
+   |
+   v
+Campaign Service
+   |
+   v
+Candidate Service
+   |
+   v
+Targeting Service
+   |
+   v
+VAST Service

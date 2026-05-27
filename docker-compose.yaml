@@ -24,8 +24,10 @@ services:
       - CAMPAIGN_SERVICE_URL=http://campaign-service:8001
       - TARGETING_SERVICE_URL=http://targeting-service:8002
       - VAST_SERVICE_URL=http://vast-service:8003
+      - CANDIDATE_SERVICE_URL=http://candidate-service:8004
     depends_on:
       - campaign-service
+      - candidate-service
       - targeting-service
       - vast-service
 
@@ -61,3 +63,13 @@ services:
       - "8003:8003"
     environment:
       - SERVICE_NAME=vast-service
+
+  candidate-service:
+    build:
+      context: .
+      dockerfile: services/candidate_service/Dockerfile
+    container_name: omniads-candidate-service
+    ports:
+      - "8004:8004"
+    environment:
+      - SERVICE_NAME=candidate-service

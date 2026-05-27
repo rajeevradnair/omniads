@@ -28,7 +28,7 @@ MediaTailor-style request
     Campaign Service
         |
         v
-    Targeting Service
+    Targeting Service◊=
         |
         v
     VAST Service

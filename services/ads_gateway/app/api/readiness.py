@@ -23,6 +23,10 @@ def readiness_check() -> ReadinessResponse:
             health_url=f"{get_campaign_service_url()}/api/v1/campaigns/health",
         ),
         check_http_dependency(
+            name="candidate-service",
+            health_url=f"{get_campaign_service_url()}/api/v1/candidates/health",
+        ),
+        check_http_dependency(
             name="targeting-service",
             health_url=f"{get_targeting_service_url()}/api/v1/targeting/health",
         ),

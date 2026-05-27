@@ -12,9 +12,11 @@ from libs.contracts.vast import VastRenderRequest
 from services.ads_gateway.app.clients.campaign_client import CampaignServiceClient
 from services.ads_gateway.app.clients.targeting_client import TargetingServiceClient
 from services.ads_gateway.app.clients.vast_client import VastServiceClient
+from services.ads_gateway.app.clients.candidate_client import CandidateServiceClient
 
 from services.ads_gateway.app.config import (
     get_campaign_service_url,
+    get_candidate_service_url,
     get_targeting_service_url,
     get_vast_service_url,
 )
@@ -51,6 +53,9 @@ def create_ad_decision(request: AdDecisionRequest) -> AdDecisionResponse:
     # Clients to various microservices
     campaign_client = CampaignServiceClient(
         base_url=get_campaign_service_url(),
+    )
+    candidate_client = CandidateServiceClient(
+        base_url=get_candidate_service_url(),
     )
     targeting_client = TargetingServiceClient(
         base_url=get_targeting_service_url(),
@@ -113,11 +118,51 @@ def create_ad_decision(request: AdDecisionRequest) -> AdDecisionResponse:
             rejected_campaigns=[],
         )
 
+    candidate_lookup_start = time.perf_counter()
+    try:
+        candidate_result = candidate_client.generate(
+            ad_request=request,
+            active_campaigns=active_campaigns,
+            max_candidates=3,
+        )
+    except httpx.HTTPError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=(
+                "ADS Gateway could not generate candidates through "
+                f"Candidate Service: {exc}"
+            ),
+        ) from exc
+
+    if not candidate_result.candidates:
+        return AdDecisionResponse(
+            request_id=trace.request_id,
+            trace_id=trace.trace_id,
+            decision_id=trace.decision_id,
+            selected_campaign_id=None,
+            selected_creative_id=None,
+            status="NO_FILL_CANDIDATES",
+            reason="Candidate Service returned no candidates.",
+            candidate_count=len(active_campaigns),
+            candidate_campaign_ids=[
+                campaign.campaign_id for campaign in active_campaigns
+            ],
+            generated_candidate_count=0,
+            generated_candidate_campaign_ids=[],
+            candidate_reasons=[],
+            eligible_candidate_count=0,
+            eligible_campaign_ids=[],
+            rejected_campaigns=[],
+            vast_xml=None,
+        )
+
+    candidates = candidate_result.candidates
+
     targeting_lookup_start = time.perf_counter()
     try:
         targeting_result = targeting_client.evaluate(
             ad_request=request,
-            candidates=active_campaigns,
+            candidates=candidates,
         )
         log_event(
             service_name="ads-gateway",
@@ -227,6 +272,11 @@ def create_ad_decision(request: AdDecisionRequest) -> AdDecisionResponse:
         candidate_campaign_ids=[
             campaign.campaign_id for campaign in active_campaigns
         ],
+        generated_candidate_count=len(candidate_result.candidates),
+        generated_candidate_campaign_ids=[
+            campaign.campaign_id for campaign in candidate_result.candidates
+        ],
+        candidate_reasons=candidate_result.candidate_reasons,
         eligible_candidate_count=len(targeting_result.eligible_campaigns),
         eligible_campaign_ids=[
             campaign.campaign_id
