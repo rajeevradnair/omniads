@@ -27,12 +27,14 @@ services:
       - CANDIDATE_SERVICE_URL=http://candidate-service:8004
       - FREQUENCY_CAP_SERVICE_URL=http://frequency-cap-service:8005
       - BUDGET_PACING_SERVICE_URL=http://budget-pacing-service:8006
+      - RANKING_SERVICE_URL=http://ranking-service:8007
     depends_on:
       - campaign-service
       - candidate-service
       - targeting-service
       - frequency-cap-service
       - budget-pacing-service
+      - ranking-service
       - vast-service
 
   campaign-service:
@@ -97,3 +99,13 @@ services:
       - "8006:8006"
     environment:
       - SERVICE_NAME=budget-pacing-service
+
+  ranking-service:
+    build:
+      context: .
+      dockerfile: services/ranking_service/Dockerfile
+    container_name: omniads-ranking-service
+    ports:
+      - "8007:8007"
+    environment:
+      - SERVICE_NAME=ranking-service

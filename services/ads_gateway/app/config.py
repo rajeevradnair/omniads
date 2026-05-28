@@ -19,3 +19,6 @@ def get_frequency_cap_service_url() -> str:
 
 def get_budget_pacing_service_url() -> str:
     return os.getenv("BUDGET_PACING_SERVICE_URL","http://budget-pacing-service:8006")
+
+def get_ranking_service_url() -> str:
+    return os.getenv("RANKING_SERVICE_URL","http://ranking-service:8007")

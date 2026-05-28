@@ -6,6 +6,7 @@ from libs.contracts.targeting import RejectedCampaign
 from libs.contracts.candidate import CandidateReason
 from libs.contracts.frequency_cap import FrequencyCapBlockedCandidate
 from libs.contracts.budget_pacing import BudgetPacingBlockedCandidate, PacingAdjustment
+from libs.contracts.ranking import RankedCandidate
 
 # Flow: 
 # active campaigns (campaign_service) 
@@ -38,4 +39,6 @@ class AdDecisionResponse(BaseModel):
     pacing_blocked: list[BudgetPacingBlockedCandidate] = Field(default_factory=list)
     budget_spend_recorded_usd: float | None = None
     campaign_new_spend_usd: float | None = None
+    ranking_winner: RankedCandidate | None = None
+    ranked_candidates: list[RankedCandidate] = Field(default_factory=list)
     vast_xml: Optional[str] = None

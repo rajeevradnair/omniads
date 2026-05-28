@@ -15,6 +15,7 @@ from services.ads_gateway.app.clients.vast_client import VastServiceClient
 from services.ads_gateway.app.clients.candidate_client import CandidateServiceClient
 from services.ads_gateway.app.clients.frequency_cap_client import FrequencyCapServiceClient
 from services.ads_gateway.app.clients.budget_pacing_client import BudgetPacingServiceClient
+from services.ads_gateway.app.clients.ranking_client import RankingServiceClient
 
 from libs.pricing.cpm import estimate_impression_cost_from_cpm
 
@@ -24,6 +25,7 @@ from services.ads_gateway.app.config import (
     get_targeting_service_url,
     get_frequency_cap_service_url,
     get_budget_pacing_service_url,
+    get_ranking_service_url,
     get_vast_service_url,
 )
 from services.ads_gateway.app.orchestration.trace_context import (
@@ -71,6 +73,9 @@ def create_ad_decision(request: AdDecisionRequest) -> AdDecisionResponse:
     )
     budget_pacing_client = BudgetPacingServiceClient(
         base_url=get_budget_pacing_service_url(),
+    )
+    ranking_client = RankingServiceClient(
+        base_url=get_ranking_service_url(),
     )
     vast_client = VastServiceClient(
         base_url=get_vast_service_url(),
@@ -230,7 +235,7 @@ def create_ad_decision(request: AdDecisionRequest) -> AdDecisionResponse:
             rejected_campaigns=targeting_result.rejected_campaigns,
         )
 
-    # Apply frequency cap at the viewer-creative level
+    # Evaluate frequency cap at the viewer-creative level
     # TODO: expand it later to viewer-advertiser, viewer-campaign level
     # and check if any of the caps are about to be breached
     try:
@@ -279,6 +284,7 @@ def create_ad_decision(request: AdDecisionRequest) -> AdDecisionResponse:
             vast_xml=None,
         )
 
+    # Evaluate budget cap at the viewer-campaign level
     try:
         pacing_result = budget_pacing_client.evaluate(
             ad_request=request,
@@ -335,8 +341,81 @@ def create_ad_decision(request: AdDecisionRequest) -> AdDecisionResponse:
             vast_xml=None,
         )
 
-    selected_campaign = pacing_result.allowed_candidates[0]
+    
+    # Rank the frequency capped and budget paced results
+    
+    # Comment this when ranking service goes live
+    try:
+        ranking_result = ranking_client.rank(
+            candidates=pacing_result.allowed_candidates,
+            pacing_adjustments=pacing_result.pacing_adjustments,
+        )
+    except httpx.HTTPError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=(
+                "ADS Gateway could not rank candidates through "
+                f"Ranking Service: {exc}"
+            ),
+        ) from exc
 
+    if ranking_result.winner is None:
+        return AdDecisionResponse(
+            request_id=trace.request_id,
+            trace_id=trace.trace_id,
+            decision_id=trace.decision_id,
+            selected_campaign_id=None,
+            selected_creative_id=None,
+            status="NO_FILL_RANKING",
+            reason="Ranking Service returned no winner.",
+            candidate_count=len(active_campaigns),
+            candidate_campaign_ids=[
+                campaign.campaign_id for campaign in active_campaigns
+            ],
+            generated_candidate_count=len(candidate_result.candidates),
+            generated_candidate_campaign_ids=[
+                campaign.campaign_id for campaign in candidate_result.candidates
+            ],
+            candidate_reasons=candidate_result.candidate_reasons,
+            eligible_candidate_count=len(targeting_result.eligible_campaigns),
+            eligible_campaign_ids=[
+                campaign.campaign_id
+                for campaign in targeting_result.eligible_campaigns
+            ],
+            rejected_campaigns=targeting_result.rejected_campaigns,
+            frequency_cap_allowed_count=len(
+                frequency_cap_result.allowed_candidates
+            ),
+            frequency_cap_allowed_campaign_ids=[
+                campaign.campaign_id
+                for campaign in frequency_cap_result.allowed_candidates
+            ],
+            frequency_cap_blocked=frequency_cap_result.blocked_candidates,
+            frequency_cap_recorded_count=None,
+            pacing_allowed_count=len(pacing_result.allowed_candidates),
+            pacing_allowed_campaign_ids=[
+                campaign.campaign_id
+                for campaign in pacing_result.allowed_candidates
+            ],
+            pacing_adjustments=pacing_result.pacing_adjustments,
+            pacing_blocked=pacing_result.blocked_candidates,
+            budget_spend_recorded_usd=None,
+            campaign_new_spend_usd=None,
+            ranking_winner=None,
+            ranked_candidates=[],
+            vast_xml=None,
+        )
+
+    winner = ranking_result.winner
+
+    selected_campaign = next(
+        campaign
+        for campaign in pacing_result.allowed_candidates
+        if campaign.campaign_id == winner.campaign_id
+        and campaign.creative_id == winner.creative_id
+    )
+
+    # Render vast xml
     vast_lookup_start = time.perf_counter()
 
     vast_request = VastRenderRequest(
@@ -373,7 +452,7 @@ def create_ad_decision(request: AdDecisionRequest) -> AdDecisionResponse:
             trace_id=trace.trace_id,
             request_id=trace.request_id,
             decision_id=trace.decision_id,
-            error_type=type(exc).__name__,
+            error_type=type(exec).__name__,
         )
 
         raise HTTPException(
@@ -381,7 +460,7 @@ def create_ad_decision(request: AdDecisionRequest) -> AdDecisionResponse:
             detail=f"ADS Gateway could not render VAST XML: {exec}",
         ) from exec
 
-    # Record the impression (well not a true impression at the moment: TODO)
+    # Record impression at viewer-creative level
     cap_record_start = time.perf_counter()
     try:
         cap_record_response = frequency_cap_client.record(
@@ -403,6 +482,7 @@ def create_ad_decision(request: AdDecisionRequest) -> AdDecisionResponse:
         base_bid_cpm_usd=float(selected_campaign.base_bid_cpm_usd),
     )
 
+    # Record budget spend at viewer-campaign level
     try:
         budget_record_response = budget_pacing_client.record_spend(
             campaign_id=selected_campaign.campaign_id,
@@ -419,16 +499,18 @@ def create_ad_decision(request: AdDecisionRequest) -> AdDecisionResponse:
             ),
         ) from exc
 
+    # Return finalized AdDecisionResponse
     return AdDecisionResponse(
         request_id=trace.request_id,
         trace_id=trace.trace_id,
         decision_id=trace.decision_id,
         selected_campaign_id=selected_campaign.campaign_id,
         selected_creative_id=selected_campaign.creative_id,
-        status="TARGETING_DECISION_RETURNED",
+        status="RANKED_VAST_DECISION_RETURNED",
         reason=(
-            "Temporary selection made from campaigns that passed top-K candidate retrieval & targeting. "
-            "Ranking logic to be added in a later release."
+            "Ranking Service selected the winning creative using base bid, "
+            "pacing multiplier, and objective weight. VAST XML was rendered "
+            "for the winner."
         ),
         candidate_count=len(active_campaigns),
         candidate_campaign_ids=[
@@ -461,4 +543,6 @@ def create_ad_decision(request: AdDecisionRequest) -> AdDecisionResponse:
         pacing_blocked=pacing_result.blocked_candidates,
         budget_spend_recorded_usd=round(estimated_spend_usd, 6),
         campaign_new_spend_usd=budget_record_response.new_spend_usd,
+        ranking_winner=ranking_result.winner,
+        ranked_candidates=ranking_result.ranked_candidates,
     )
