@@ -26,11 +26,13 @@ services:
       - VAST_SERVICE_URL=http://vast-service:8003
       - CANDIDATE_SERVICE_URL=http://candidate-service:8004
       - FREQUENCY_CAP_SERVICE_URL=http://frequency-cap-service:8005
+      - BUDGET_PACING_SERVICE_URL=http://budget-pacing-service:8006
     depends_on:
       - campaign-service
       - candidate-service
       - targeting-service
       - frequency-cap-service
+      - budget-pacing-service
       - vast-service
 
   campaign-service:
@@ -85,3 +87,13 @@ services:
       - "8005:8005"
     environment:
       - SERVICE_NAME=frequency-cap-service
+
+  budget-pacing-service:
+    build:
+      context: .
+      dockerfile: services/budget_pacing_service/Dockerfile
+    container_name: omniads-budget-pacing-service
+    ports:
+      - "8006:8006"
+    environment:
+      - SERVICE_NAME=budget-pacing-service

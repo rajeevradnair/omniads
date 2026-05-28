@@ -51,3 +51,14 @@ Budget pacing will be added later.
 Pacing will answer:
 
 > Is the campaign spending too quickly or too slowly relative to its budget and time remaining?
+
+## Budget Pacing
+
+Budget pacing prevents campaigns from spending too quickly or too slowly.
+
+The Budget Pacing Service compares:
+
+```text
+actual spend so far
+expected spend so far
+```

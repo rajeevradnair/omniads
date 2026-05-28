@@ -4,3 +4,4 @@
 8003 VAST Service
 8004 Candidate Service
 8005 Frequency Cap Service
+8006 Budget Pacing Service

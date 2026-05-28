@@ -139,3 +139,38 @@ Frequency Cap Service
    |
    v
 VAST Service
+```
+
+## Budget Pacing Service
+
+The Budget Pacing Service was added in Release 2 to prevent campaign overspend and support delivery control.
+
+Current endpoints:
+
+- `GET /api/v1/pacing/health`
+- `POST /api/v1/pacing/evaluate`
+- `POST /api/v1/pacing/record-spend`
+
+Current flow:
+
+```text
+ADS Gateway
+   |
+   v
+Campaign Service
+   |
+   v
+Candidate Service
+   |
+   v
+Targeting Service
+   |
+   v
+Frequency Cap Service
+   |
+   v
+Budget Pacing Service
+   |
+   v
+VAST Service
+```

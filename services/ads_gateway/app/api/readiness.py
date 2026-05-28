@@ -6,6 +6,7 @@ from services.ads_gateway.app.config import (
     get_candidate_service_url,
     get_targeting_service_url,
     get_frequency_cap_service_url,
+    get_budget_pacing_service_url,
     get_vast_service_url,
 )
 from services.ads_gateway.app.orchestration.readiness_probe import (
@@ -34,7 +35,11 @@ def readiness_check() -> ReadinessResponse:
         ),
         check_http_dependency(
             name="frequency-cap-service",
-            health_url=f"{get_frequency_cap_service_url()}/api/v1/frequency-caps/health",
+            health_url=f"{get_frequency_cap_service_url()}/api/v1/frequency_caps/health",
+        ),
+        check_http_dependency(
+            name="budget-pacing-service",
+            health_url=f"{get_budget_pacing_service_url()}/api/v1/pacing/health",
         ),
         check_http_dependency(
             name="vast-service",
