@@ -1,0 +1,11 @@
+{
+  "creative_id": "creative_autosure_30s",
+  "campaign_id": "camp_autosure_sports_fans",
+  "advertiser_name": "AutoSure Car Insurance",
+  "creative_name": "Protected Every Mile",
+  "duration_seconds": 30,
+  "media_url": "http://localhost:9000/assets/ads/autosure_30s.mp4",
+  "creative_type": "VIDEO",
+  "placement": "sports_midroll_001",
+  "message": "Insurance protection for everyday drivers"
+}

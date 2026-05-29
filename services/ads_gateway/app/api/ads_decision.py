@@ -17,6 +17,7 @@ from services.ads_gateway.app.clients.frequency_cap_client import FrequencyCapSe
 from services.ads_gateway.app.clients.budget_pacing_client import BudgetPacingServiceClient
 from services.ads_gateway.app.clients.ranking_client import RankingServiceClient
 
+from libs.contracts.vast import VastPodRenderRequest
 from libs.pricing.cpm import estimate_impression_cost_from_cpm
 
 from services.ads_gateway.app.config import (
@@ -343,12 +344,11 @@ def create_ad_decision(request: AdDecisionRequest) -> AdDecisionResponse:
 
     
     # Rank the frequency capped and budget paced results
-    
-    # Comment this when ranking service goes live
     try:
         ranking_result = ranking_client.rank(
             candidates=pacing_result.allowed_candidates,
             pacing_adjustments=pacing_result.pacing_adjustments,
+            target_pod_duration_seconds=90,
         )
     except httpx.HTTPError as exc:
         raise HTTPException(
@@ -359,6 +359,35 @@ def create_ad_decision(request: AdDecisionRequest) -> AdDecisionResponse:
             ),
         ) from exc
 
+    packed_ad_pod = ranking_result.packed_ad_pod
+
+    if packed_ad_pod is None or not packed_ad_pod.selected_ads:
+        return AdDecisionResponse(
+            request_id=trace.request_id,
+            trace_id=trace.trace_id,
+            decision_id=trace.decision_id,
+            selected_campaign_id=None,
+            selected_creative_id=None,
+            status="NO_FILL_AD_POD",
+            reason="Ranking Service could not pack any ads into the ad pod.",
+            ranked_candidates=ranking_result.ranked_candidates,
+            ranking_winner=ranking_result.winner,
+            packed_ad_pod=packed_ad_pod,
+            vast_xml=None,
+        )
+
+    vast_pod_request = VastPodRenderRequest(
+        request_id=trace.request_id,
+        trace_id=trace.trace_id,
+        decision_id=trace.decision_id,
+        selected_ads=packed_ad_pod.selected_ads,
+    )
+
+    vast_response = vast_client.render_vast_pod(vast_pod_request)
+
+    primary_ad = packed_ad_pod.selected_ads[0]
+
+    '''
     if ranking_result.winner is None:
         return AdDecisionResponse(
             request_id=trace.request_id,
@@ -459,7 +488,7 @@ def create_ad_decision(request: AdDecisionRequest) -> AdDecisionResponse:
             status_code=502,
             detail=f"ADS Gateway could not render VAST XML: {exec}",
         ) from exec
-
+    
     # Record impression at viewer-creative level
     cap_record_start = time.perf_counter()
     try:
@@ -498,20 +527,38 @@ def create_ad_decision(request: AdDecisionRequest) -> AdDecisionResponse:
                 f"{exc}"
             ),
         ) from exc
+    '''
+    
+    frequency_cap_recorded_counts = []
+    total_estimated_spend_usd = 0.0
+
+    for ad in packed_ad_pod.selected_ads:
+        cap_record_response = frequency_cap_client.record(
+            viewer_id=request.viewer_id,
+            campaign_id=ad.campaign_id,
+            creative_id=ad.creative_id,
+            decision_id=trace.decision_id,
+        )
+        frequency_cap_recorded_counts.append(cap_record_response.new_count)
+
+        estimated_spend_usd = estimate_impression_cost_from_cpm(
+            base_bid_cpm_usd=ad.base_bid_cpm_usd,
+        )
+        total_estimated_spend_usd += estimated_spend_usd
+
+        budget_pacing_client.record_spend(
+            campaign_id=ad.campaign_id,
+            creative_id=ad.creative_id,
+            decision_id=trace.decision_id,
+            spend_usd=estimated_spend_usd,
+        )
+
 
     # Return finalized AdDecisionResponse
     return AdDecisionResponse(
         request_id=trace.request_id,
         trace_id=trace.trace_id,
         decision_id=trace.decision_id,
-        selected_campaign_id=selected_campaign.campaign_id,
-        selected_creative_id=selected_campaign.creative_id,
-        status="RANKED_VAST_DECISION_RETURNED",
-        reason=(
-            "Ranking Service selected the winning creative using base bid, "
-            "pacing multiplier, and objective weight. VAST XML was rendered "
-            "for the winner."
-        ),
         candidate_count=len(active_campaigns),
         candidate_campaign_ids=[
             campaign.campaign_id for campaign in active_campaigns
@@ -527,22 +574,30 @@ def create_ad_decision(request: AdDecisionRequest) -> AdDecisionResponse:
             for campaign in targeting_result.eligible_campaigns
         ],
         rejected_campaigns=targeting_result.rejected_campaigns,
-        vast_xml=vast_response.vast_xml,
         frequency_cap_allowed_count=len(frequency_cap_result.allowed_candidates),
         frequency_cap_allowed_campaign_ids=[
             campaign.campaign_id
             for campaign in frequency_cap_result.allowed_candidates
         ],
         frequency_cap_blocked=frequency_cap_result.blocked_candidates,
-        frequency_cap_recorded_count=cap_record_response.new_count,
         pacing_allowed_count=len(pacing_result.allowed_candidates),
         pacing_allowed_campaign_ids=[
             campaign.campaign_id for campaign in pacing_result.allowed_candidates
         ],
         pacing_adjustments=pacing_result.pacing_adjustments,
         pacing_blocked=pacing_result.blocked_candidates,
-        budget_spend_recorded_usd=round(estimated_spend_usd, 6),
-        campaign_new_spend_usd=budget_record_response.new_spend_usd,
+        selected_campaign_id=primary_ad.campaign_id,
+        selected_creative_id=primary_ad.creative_id,
+        status="POD_VAST_DECISION_RETURNED",
+        reason=(
+            "Ranking Service ranked candidates and packed a duration-aware ad pod. "
+            "VAST Service rendered a multi-ad VAST response."
+        ),
         ranking_winner=ranking_result.winner,
         ranked_candidates=ranking_result.ranked_candidates,
+        packed_ad_pod=packed_ad_pod,
+        vast_xml=vast_response.vast_xml,
+        frequency_cap_recorded_count=max(frequency_cap_recorded_counts),
+        budget_spend_recorded_usd=round(total_estimated_spend_usd, 6),
+        campaign_new_spend_usd=None,
     )

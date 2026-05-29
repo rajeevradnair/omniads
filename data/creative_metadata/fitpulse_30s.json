@@ -1,0 +1,11 @@
+{
+  "creative_id": "creative_fitpulse_30s",
+  "campaign_id": "camp_fitpulse_performance",
+  "advertiser_name": "FitPulse Smartwatch",
+  "creative_name": "Train Like a Pro",
+  "duration_seconds": 30,
+  "media_url": "http://localhost:9000/assets/ads/fitpulse_30s.mp4",
+  "creative_type": "VIDEO",
+  "placement": "sports_midroll_001",
+  "message": "Smartwatch performance tracking for sports fans"
+}

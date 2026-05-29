@@ -13,4 +13,5 @@ def rank_candidates_endpoint(request: RankingRequest) -> RankingResponse:
     return rank_candidates(
         candidates=request.candidates,
         pacing_adjustments=request.pacing_adjustments,
+        target_pod_duration_seconds=request.target_pod_duration_seconds,
     )

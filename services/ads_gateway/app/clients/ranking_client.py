@@ -18,6 +18,7 @@ class RankingServiceClient:
         self,
         candidates: list[ActiveCampaign],
         pacing_adjustments: list[PacingAdjustment],
+        target_pod_duration_seconds: int = 90,
     ) -> RankingResponse:
         """Rank candidates and return winner plus ranked list."""
 
@@ -26,6 +27,7 @@ class RankingServiceClient:
         payload = RankingRequest(
             candidates=candidates,
             pacing_adjustments=pacing_adjustments,
+            target_pod_duration_seconds=target_pod_duration_seconds,
         )
 
         response = httpx.post(

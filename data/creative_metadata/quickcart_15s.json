@@ -1,0 +1,11 @@
+{
+  "creative_id": "creative_quickcart_15s",
+  "campaign_id": "camp_quickcart_match_day",
+  "advertiser_name": "QuickCart Grocery Delivery",
+  "creative_name": "Snacks Before Overtime",
+  "duration_seconds": 15,
+  "media_url": "http://localhost:9000/assets/ads/quickcart_15s.mp4",
+  "creative_type": "VIDEO",
+  "placement": "sports_midroll_001",
+  "message": "Grocery delivery for game-day snacks"
+}

@@ -1,7 +1,7 @@
 import httpx
 
 from libs.contracts.vast import VastRenderRequest, VastRenderResponse
-
+from libs.contracts.vast import VastPodRenderRequest, VastPodRenderResponse
 
 class VastServiceClient:
     """HTTP client for talking to VAST Service."""
@@ -25,3 +25,20 @@ class VastServiceClient:
         response.raise_for_status()
 
         return VastRenderResponse(**response.json())
+    
+    def render_vast_pod(
+        self,
+        request: VastPodRenderRequest,
+    ) -> VastPodRenderResponse:
+        """Render VAST XML for a packed ad pod."""
+
+        url = f"{self.base_url}/api/v1/vast/render_pod"
+
+        response = httpx.post(
+            url,
+            json=request.model_dump(),
+            timeout=self.timeout_seconds,
+        )
+        response.raise_for_status()
+
+        return VastPodRenderResponse(**response.json())

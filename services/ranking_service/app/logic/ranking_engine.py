@@ -1,11 +1,12 @@
 from libs.contracts.budget_pacing import PacingAdjustment
 from libs.contracts.campaign import ActiveCampaign
 from libs.contracts.ranking import RankedCandidate, RankingResponse
-
+from services.ranking_service.app.logic.ad_pod_packer import pack_ad_pod
 
 def rank_candidates(
     candidates: list[ActiveCampaign],
     pacing_adjustments: list[PacingAdjustment],
+    target_pod_duration_seconds: int = 90,
 ) -> RankingResponse:
     """Rank candidates using a simple eCPM-style scoring formula."""
 
@@ -32,6 +33,8 @@ def rank_candidates(
                 creative_id=candidate.creative_id,
                 creative_name=candidate.creative_name,
                 advertiser_name=candidate.advertiser_name,
+                media_url=candidate.media_url,
+                duration_seconds=candidate.duration_seconds,
                 base_bid_cpm_usd=float(candidate.base_bid_cpm_usd),
                 pacing_multiplier=pacing_multiplier,
                 objective_weight=objective_weight,
@@ -55,11 +58,17 @@ def rank_candidates(
         for index, candidate in enumerate(scored_candidates)
     ]
 
+    packed_ad_pod = pack_ad_pod(
+        ranked_candidates=ranked_candidates, 
+        target_duration_seconds=target_pod_duration_seconds
+    )
+
     winner = ranked_candidates[0] if ranked_candidates else None
 
     return RankingResponse(
         winner=winner,
         ranked_candidates=ranked_candidates,
+        packed_ad_pod=packed_ad_pod,
     )
 
 
