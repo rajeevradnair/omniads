@@ -8,6 +8,7 @@ from libs.contracts.frequency_cap import FrequencyCapBlockedCandidate
 from libs.contracts.budget_pacing import BudgetPacingBlockedCandidate, PacingAdjustment
 from libs.contracts.ranking import RankedCandidate
 from libs.contracts.ranking import PackedAdPod
+from libs.contracts.decision_trace import DecisionTraceSummary
 
 # Flow: 
 # active campaigns (campaign_service) 
@@ -44,3 +45,4 @@ class AdDecisionResponse(BaseModel):
     ranked_candidates: list[RankedCandidate] = Field(default_factory=list)
     packed_ad_pod: PackedAdPod | None = None
     vast_xml: Optional[str] = None
+    decision_trace: DecisionTraceSummary | None = None

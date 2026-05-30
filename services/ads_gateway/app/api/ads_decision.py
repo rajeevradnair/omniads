@@ -32,7 +32,10 @@ from services.ads_gateway.app.config import (
 from services.ads_gateway.app.orchestration.trace_context import (
     create_decision_trace,
 )
-
+from libs.contracts.decision_trace import (
+    DecisionTraceStep,
+    DecisionTraceSummary,
+)
 router = APIRouter()
 
 
@@ -41,6 +44,8 @@ def create_ad_decision(request: AdDecisionRequest) -> AdDecisionResponse:
     """Create an ad decision using Campaign and Targeting services."""
 
     trace = create_decision_trace()
+
+    trace_steps = []
 
     workflow_start = time.perf_counter()
 
@@ -87,6 +92,16 @@ def create_ad_decision(request: AdDecisionRequest) -> AdDecisionResponse:
     try:
         active_campaigns = campaign_client.list_active_campaigns(
             placement_id=request.placement_id,
+        )
+        trace_steps.append(
+            DecisionTraceStep(
+            service_name="campaign-service",
+            operation_name="active_campaign_lookup",
+            status="success",
+            input_count=1,
+            output_count=len(active_campaigns),
+            reasons=["ACTIVE_CAMPAIGNS_RETURNED"],
+            )
         )
         log_event(
             service_name="ads-gateway",
@@ -149,6 +164,16 @@ def create_ad_decision(request: AdDecisionRequest) -> AdDecisionResponse:
             active_campaigns=active_campaigns,
             max_candidates=3,
         )
+        trace_steps.append(
+            DecisionTraceStep(
+                service_name="candidate-service",
+                operation_name="candidate_generation",
+                status="success",
+                input_count=len(active_campaigns),
+                output_count=len(candidate_result.candidates),
+                reasons=["TOP_K_CANDIDATES_GENERATED"],
+            )
+        )
     except httpx.HTTPError as exc:
         raise HTTPException(
             status_code=502,
@@ -188,6 +213,19 @@ def create_ad_decision(request: AdDecisionRequest) -> AdDecisionResponse:
         targeting_result = targeting_client.evaluate(
             ad_request=request,
             candidates=candidates,
+        )
+        trace_steps.append(
+            DecisionTraceStep(
+                service_name="targeting-service",
+                operation_name="targeting_evaluation",
+                status="success",
+                input_count=len(candidate_result.candidates),
+                output_count=len(targeting_result.eligible_campaigns),
+                reasons=[
+                    "TARGETING_FILTERS_APPLIED",
+                    f"REJECTED_{len(targeting_result.rejected_campaigns)}",
+                ],
+            )
         )
         log_event(
             service_name="ads-gateway",
@@ -245,6 +283,19 @@ def create_ad_decision(request: AdDecisionRequest) -> AdDecisionResponse:
             candidates=targeting_result.eligible_campaigns,
             max_daily_impressions_per_creative=3,
         )
+        trace_steps.append(
+            DecisionTraceStep(
+                service_name="frequency-cap-service",
+                operation_name="frequency_cap_evaluation",
+                status="success",
+                input_count=len(targeting_result.eligible_campaigns),
+                output_count=len(frequency_cap_result.allowed_candidates),
+                reasons=[
+                    "FREQUENCY_CAPS_APPLIED",
+                    f"BLOCKED_{len(frequency_cap_result.blocked_candidates)}",
+                ],
+            )
+        )
     except httpx.HTTPError as exc:
         raise HTTPException(
             status_code=502,
@@ -290,6 +341,19 @@ def create_ad_decision(request: AdDecisionRequest) -> AdDecisionResponse:
         pacing_result = budget_pacing_client.evaluate(
             ad_request=request,
             candidates=frequency_cap_result.allowed_candidates,
+        )
+        trace_steps.append(
+            DecisionTraceStep(
+                service_name="budget-pacing-service",
+                operation_name="budget_pacing_evaluation",
+                status="success",
+                input_count=len(frequency_cap_result.allowed_candidates),
+                output_count=len(pacing_result.allowed_candidates),
+                reasons=[
+                    "PACING_MULTIPLIERS_APPLIED",
+                    f"BLOCKED_{len(pacing_result.blocked_candidates)}",
+                ],
+            )
         )
     except httpx.HTTPError as exc:
         raise HTTPException(
@@ -350,6 +414,23 @@ def create_ad_decision(request: AdDecisionRequest) -> AdDecisionResponse:
             pacing_adjustments=pacing_result.pacing_adjustments,
             target_pod_duration_seconds=90,
         )
+        trace_steps.append(
+            DecisionTraceStep(
+                service_name="ranking-service",
+                operation_name="ranking_and_pod_packing",
+                status="success",
+                input_count=len(pacing_result.allowed_candidates),
+                output_count=(
+                    len(ranking_result.packed_ad_pod.selected_ads)
+                    if ranking_result.packed_ad_pod
+                    else 0
+                ),
+                reasons=[
+                    "RANKED_CANDIDATES",
+                    "PACKED_AD_POD",
+                ],
+            )
+        )
     except httpx.HTTPError as exc:
         raise HTTPException(
             status_code=502,
@@ -384,6 +465,17 @@ def create_ad_decision(request: AdDecisionRequest) -> AdDecisionResponse:
     )
 
     vast_response = vast_client.render_vast_pod(vast_pod_request)
+
+    trace_steps.append(
+        DecisionTraceStep(
+            service_name="vast-service",
+            operation_name="vast_pod_rendering",
+            status="success",
+            input_count=len(packed_ad_pod.selected_ads),
+            output_count=vast_response.ad_count,
+            reasons=["MULTI_AD_VAST_RENDERED"],
+        )
+    )
 
     primary_ad = packed_ad_pod.selected_ads[0]
 
@@ -553,6 +645,28 @@ def create_ad_decision(request: AdDecisionRequest) -> AdDecisionResponse:
             spend_usd=estimated_spend_usd,
         )
 
+    log_event(
+        service_name="ads-gateway",
+        operation_name="ad_decision_finished",
+        status="success",
+        trace_id=trace.trace_id,
+        request_id=trace.request_id,
+        decision_id=trace.decision_id,
+        latency_ms=(time.perf_counter() - workflow_start) * 1000,
+    )
+
+    decision_trace = DecisionTraceSummary(
+        request_id=trace.request_id,
+        trace_id=trace.trace_id,
+        decision_id=trace.decision_id,
+        viewer_id=request.viewer_id,
+        session_id=request.session_id,
+        content_id=request.content_id,
+        placement_id=request.placement_id,
+        ad_break_id=request.ad_break_id,
+        final_status="POD_VAST_DECISION_RETURNED",
+        steps=trace_steps,
+    )
 
     # Return finalized AdDecisionResponse
     return AdDecisionResponse(
@@ -600,4 +714,5 @@ def create_ad_decision(request: AdDecisionRequest) -> AdDecisionResponse:
         frequency_cap_recorded_count=max(frequency_cap_recorded_counts),
         budget_spend_recorded_usd=round(total_estimated_spend_usd, 6),
         campaign_new_spend_usd=None,
+        decision_trace=decision_trace,
     )

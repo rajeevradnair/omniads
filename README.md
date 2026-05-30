@@ -174,3 +174,32 @@ Budget Pacing Service
    v
 VAST Service
 ```
+
+## Release 2 — Real-Time Decision Engine
+
+Release 2 adds the decision-engine layer on top of the Release 1 ADS foundation.
+
+Current flow:
+
+```text
+Campaign
+  → Candidate
+  → Targeting
+  → Frequency Cap
+  → Budget Pacing
+  → Ranking
+  → Ad Pod Packing
+  → VAST
+```
+
+## Release 2 capabilities include:
+
+- top-K candidate generation
+- targeting reason codes
+- viewer-creative frequency capping
+- campaign budget pacing
+- eCPM-style ranking
+- 90-second ad pod packing
+- multi-ad VAST rendering
+- decision trace summary
+- contract tests
