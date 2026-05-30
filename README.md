@@ -213,3 +213,5 @@ Current endpoint:
 
 Current local event lake:
 data/synthetic_events/event_type=<event_type>/year=<yyyy>/month=<mm>/day=<dd>/events.jsonl
+
+TODO: Map to S3
