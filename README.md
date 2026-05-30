@@ -203,3 +203,13 @@ Campaign
 - multi-ad VAST rendering
 - decision trace summary
 - contract tests
+
+## Event Logging Service
+
+The Event Logging Service records ad decision and tracking events.
+
+Current endpoint:
+- POST /api/v1/events
+
+Current local event lake:
+data/synthetic_events/event_type=<event_type>/year=<yyyy>/month=<mm>/day=<dd>/events.jsonl

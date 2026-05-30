@@ -28,6 +28,7 @@ services:
       - FREQUENCY_CAP_SERVICE_URL=http://frequency-cap-service:8005
       - BUDGET_PACING_SERVICE_URL=http://budget-pacing-service:8006
       - RANKING_SERVICE_URL=http://ranking-service:8007
+      - EVENT_LOGGING_SERVICE_URL=http://event-logging-service:8008
     depends_on:
       - campaign-service
       - candidate-service
@@ -36,6 +37,7 @@ services:
       - budget-pacing-service
       - ranking-service
       - vast-service
+      - event-logging-service
 
   campaign-service:
     build:
@@ -109,3 +111,15 @@ services:
       - "8007:8007"
     environment:
       - SERVICE_NAME=ranking-service
+
+  event-logging-service:
+    build:
+      context: .
+      dockerfile: services/event_logging_service/Dockerfile
+    container_name: omniads-event-logging-service
+    ports:
+      - "8008:8008"
+    volumes:
+      - ./data/synthetic_events:/app/data/synthetic_events
+    environment:
+      - SERVICE_NAME=event-logging-service

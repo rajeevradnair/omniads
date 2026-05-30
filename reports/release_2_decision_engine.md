@@ -16,8 +16,6 @@ Release 2 added the core real-time decision engine capabilities:
 
 ## Why It Matters
 
-Release 1 proved the basic Gateway → Campaign → Targeting → VAST foundation.
-
 Release 2 makes the platform behave more like a real ad decisioning engine by adding:
 
 - top-K candidate generation

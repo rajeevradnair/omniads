@@ -9,6 +9,7 @@ from services.ads_gateway.app.config import (
     get_budget_pacing_service_url,
     get_ranking_service_url,
     get_vast_service_url,
+    get_event_logging_service_url,
 )
 from services.ads_gateway.app.orchestration.readiness_probe import (
     check_http_dependency,
@@ -49,6 +50,10 @@ def readiness_check() -> ReadinessResponse:
         check_http_dependency(
             name="vast-service",
             health_url=f"{get_vast_service_url()}/api/v1/vast/health",
+        ),
+        check_http_dependency(
+            name="event-logging-service",
+            health_url=f"{get_event_logging_service_url()}/api/v1/events/health",
         ),
     ]
 

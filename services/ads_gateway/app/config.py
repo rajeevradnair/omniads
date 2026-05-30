@@ -22,3 +22,6 @@ def get_budget_pacing_service_url() -> str:
 
 def get_ranking_service_url() -> str:
     return os.getenv("RANKING_SERVICE_URL","http://ranking-service:8007")
+
+def get_event_logging_service_url() -> str:
+    return os.getenv("EVENT_LOGGING_SERVICE_URL","http://event-logging-service:8008")

@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException
 from libs.contracts.ad_request import AdDecisionRequest
 from libs.contracts.ad_response import AdDecisionResponse
 from libs.contracts.vast import VastRenderRequest
+from libs.contracts.events import AdEvent, AdEventType
 
 from services.ads_gateway.app.clients.campaign_client import CampaignServiceClient
 from services.ads_gateway.app.clients.targeting_client import TargetingServiceClient
@@ -16,6 +17,7 @@ from services.ads_gateway.app.clients.candidate_client import CandidateServiceCl
 from services.ads_gateway.app.clients.frequency_cap_client import FrequencyCapServiceClient
 from services.ads_gateway.app.clients.budget_pacing_client import BudgetPacingServiceClient
 from services.ads_gateway.app.clients.ranking_client import RankingServiceClient
+from services.ads_gateway.app.clients.event_client import EventLoggingServiceClient
 
 from libs.contracts.vast import VastPodRenderRequest
 from libs.pricing.cpm import estimate_impression_cost_from_cpm
@@ -28,6 +30,7 @@ from services.ads_gateway.app.config import (
     get_budget_pacing_service_url,
     get_ranking_service_url,
     get_vast_service_url,
+    get_event_logging_service_url,
 )
 from services.ads_gateway.app.orchestration.trace_context import (
     create_decision_trace,
@@ -85,6 +88,9 @@ def create_ad_decision(request: AdDecisionRequest) -> AdDecisionResponse:
     )
     vast_client = VastServiceClient(
         base_url=get_vast_service_url(),
+    )
+    event_client = EventLoggingServiceClient(
+        base_url=get_event_logging_service_url(),
     )
 
     # Fetch active campaigns
@@ -654,6 +660,61 @@ def create_ad_decision(request: AdDecisionRequest) -> AdDecisionResponse:
         decision_id=trace.decision_id,
         latency_ms=(time.perf_counter() - workflow_start) * 1000,
     )
+
+    decision_event = AdEvent(
+        event_type=AdEventType.AD_DECISION_CREATED,
+        request_id=trace.request_id,
+        trace_id=trace.trace_id,
+        decision_id=trace.decision_id,
+        viewer_id=request.viewer_id,
+        session_id=request.session_id,
+        content_id=request.content_id,
+        placement_id=request.placement_id,
+        ad_break_id=request.ad_break_id,
+        device=request.device,
+        geo=request.geo,
+        status="POD_DECISION_CREATED",
+        attributes={
+            "candidate_count": len(active_campaigns),
+            "generated_candidate_count": len(candidate_result.candidates),
+            "eligible_candidate_count": len(targeting_result.eligible_campaigns),
+            "frequency_cap_allowed_count": len(
+                frequency_cap_result.allowed_candidates
+            ),
+            "pacing_allowed_count": len(pacing_result.allowed_candidates),
+            "ranked_candidate_count": len(ranking_result.ranked_candidates),
+            "pod_ad_count": len(packed_ad_pod.selected_ads),
+            "pod_fill_rate": packed_ad_pod.fill_rate,
+        },
+    )
+    
+    vast_event = AdEvent(
+        event_type=AdEventType.VAST_RETURNED,
+        request_id=trace.request_id,
+        trace_id=trace.trace_id,
+        decision_id=trace.decision_id,
+        viewer_id=request.viewer_id,
+        session_id=request.session_id,
+        content_id=request.content_id,
+        placement_id=request.placement_id,
+        ad_break_id=request.ad_break_id,
+        device=request.device,
+        geo=request.geo,
+        status="VAST_RETURNED",
+        attributes={
+            "vast_ad_count": vast_response.ad_count,
+            "vast_total_duration_seconds": vast_response.total_duration_seconds,
+            "selected_creative_ids": [
+                ad.creative_id for ad in packed_ad_pod.selected_ads
+            ],
+            "selected_campaign_ids": [
+                ad.campaign_id for ad in packed_ad_pod.selected_ads
+            ],
+        },
+    )
+
+    event_client.ingest(decision_event)
+    event_client.ingest(vast_event)
 
     decision_trace = DecisionTraceSummary(
         request_id=trace.request_id,
